@@ -29,6 +29,13 @@ if __name__ == '__main__':
         exit(-1)
     cv2.namedWindow('calib')
     cv2.setMouseCallback('calib', onMouseCallback)
+
+    with open(args.output, 'r+') as w:
+        root = json.load(w)
+        root["areaNames"] = []
+
+
+    areaNum = 1
     while 1:
         cp = img.copy()
         for i in range(len(points)-1):
@@ -36,18 +43,28 @@ if __name__ == '__main__':
         cv2.imshow('calib', cp)
         q = cv2.waitKey(30)
         if q == ord('q'):
+            if len(points) == 0: break
+            root["areaNames"].append("area" + str(areaNum))
+            for point in points:
+                root["area" + str(areaNum)].append(point)
+            points = []
+            areaNum += 1
             break
         elif q == ord('x'):
             points = points[:len(points) - 1]
+        elif q == ord('n'):
+            root["areaNames"].append("area"+str(areaNum))
+            root["area" + str(areaNum)] = []
+            for point in points:
+                root["area"+str(areaNum)].append(point)
+            points = []
+            areaNum += 1
 
 
-    with open(args.output, 'r+') as w:
-        root = json.load(w)
-        root['area'] = []
-        for p in points:
-            root['area'].append(p)
 
 
+
+    print(root)
     with open(args.output, 'w')  as w:
 
         json.dump(root, w)

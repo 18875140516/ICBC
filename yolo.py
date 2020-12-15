@@ -16,8 +16,8 @@ from keras.models import load_model
 from PIL import Image, ImageFont, ImageDraw
 import time
 import tensorflow as tf
-
-from yolo3.model import yolo_eval
+from keras.layers import Input
+from yolo3.model import yolo_eval, yolo_body
 from yolo3.utils import letterbox_image
 # from opt import args
 args = dict()
@@ -30,10 +30,10 @@ if('tensorflow' == K.backend()):
     sess = tf.Session(config=config)
 
 class YOLO(object):
-    def __init__(self):
-        self.model_path = '../model_data/yolo.h5'
+    def __init__(self,class_path = '../model_data/coco_classes.txt', model_path='../model_data/yolo.h5'):
+        self.model_path = model_path
         self.anchors_path = '../model_data/yolo_anchors.txt'
-        self.classes_path = '../model_data/coco_classes.txt'
+        self.classes_path = class_path
         #具体参数可实验后进行调整
         if args["class"] == 'person':
            self.score = 0.8 #0.8
@@ -75,7 +75,23 @@ class YOLO(object):
         model_path = os.path.expanduser(self.model_path)
         assert model_path.endswith('.h5'), 'Keras model must be a .h5 file.'
 
-        self.yolo_model = load_model(model_path, compile=False)
+        num_anchors = len(self.anchors)
+        num_classes = len(self.class_names)
+
+
+        try:
+            self.yolo_model = load_model(model_path, compile=False)
+        except:
+            self.yolo_model = yolo_body(Input(shape=(None, None, 3)), num_anchors // 3, num_classes)
+            self.yolo_model.load_weights(self.model_path)
+        else:
+            assert self.yolo_model.layers[-1].output_shape[-1] == \
+                   num_anchors / len(self.yolo_model.output) * (num_classes + 5), \
+                'Mismatch between model and given anchor and class sizes'
+
+
+        # self.yolo_model = load_model(model_path, compile=False)
+
         print('{} model, anchors, and classes loaded.'.format(model_path))
 
         # Generate colors for drawing bounding boxes.
@@ -129,7 +145,7 @@ class YOLO(object):
                print(predicted_class)
                continue
             '''
-            if predicted_class != args["class"]:
+            if predicted_class != 'person':
                #print(predicted_class)
                continue
 

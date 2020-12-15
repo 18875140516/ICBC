@@ -1,6 +1,1 @@
-{
-  "maxStandingTime": 15,
-  "standingURL": "/media/video/test.avi",
-  "area": [ ]
-
-}
+{"maxStandingTime": 15, "standingURL": "/media/video/test.avi", "area": [[112, 271], [243, 488], [650, 431], [480, 230]]}

@@ -1,6 +1,6 @@
 # vim: expandtab:ts=4:sw=4
 
-
+import time
 class TrackState:
     """
     Enumeration type for the single target track state. Newly created tracks are
@@ -65,6 +65,7 @@ class Track:
 
     def __init__(self, mean, covariance, track_id, n_init, max_age,
                  feature=None, alpha=0.1):
+
         self.mean = mean
         self.covariance = covariance
         self.track_id = track_id
@@ -72,7 +73,8 @@ class Track:
         self.age = 1
         self.alpha = alpha
         self.time_since_update = 0
-
+        self.start_time = time.time()
+        self.outside = True
         self.state = TrackState.Tentative
         self.features = []
         self.smooth_feat = None
@@ -82,6 +84,8 @@ class Track:
 
         self._n_init = n_init
         self._max_age = max_age
+
+        self.startArea = None
 
     def to_tlwh(self):
         """Get current position in bounding box format `(top left x, top left y,
@@ -167,3 +171,26 @@ class Track:
     def is_deleted(self):
         """Returns True if this track is dead and should be deleted."""
         return self.state == TrackState.Deleted
+
+    def update_time(self, inside):
+        if inside and self.outside:
+            self.start_time = time.time()
+            self.outside = False
+
+
+
+    def standing_time(self):
+        return int(time.time() - self.start_time)
+
+    def update_area(self, area='outside'):
+        if area == 'outside':
+            pass
+        else:
+            if self.startArea is not None and self.startArea != area:
+                self.startArea = area
+                return time.strftime('%Y%m%d%H%M'), self.startArea, area
+            elif self.startArea is not None and self.startArea == area:
+                return None
+            else:
+                self.startArea = area
+                return None
