@@ -25,7 +25,8 @@ from mgn.network import MGN
 # from coordinate_transform import CoordTrans
 from mgn.utils.extract_feature import extract_feature
 from yolo import YOLO
-from util.util import checkPoint
+from utils.util import checkPoint
+import paho.mqtt.publish as publish
 # from debug_cost_mat import *
 warnings.filterwarnings('ignore')
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
@@ -144,7 +145,7 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
         for id, det in enumerate(det_out):
             bbox = det.tlwh.copy()
             bbox[2:] += bbox[:2]
-            print(bbox)
+            # print(bbox)
             cv2.rectangle(frame, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 255), 2)
 
         detections = det_in
@@ -165,8 +166,13 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
             cv2.rectangle(frame, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (0, 255, 0), 2)
             cv2.putText(frame, str(track.standing_time()) + 's', (int(bbox[0]), int(bbox[1])-20), 0, 5e-3 * 200, (0, 255, 0), 2)
             # cv2.putText(frame, str(track.track_id), (int(bbox[0]), int(bbox[1])), 0, 5e-3 * 200, (0, 255, 0), 2)
+        if args.use_model == True and idx % 5 == 1:
+            cv2.imwrite('/media/image/head.jpg', frame)
+            # publish.single('image', payload='c', hostname='127.0.0.1')
+        idx += 1
         cv2.imshow('win', frame)
-        fps = (fps + (1. / (time.time() - t1))) / 2
+        fps = (time.time() - t1)*1000
+        print(fps)
         if cv2.waitKey(30) == ord('q'):
             break
 
@@ -196,8 +202,9 @@ if __name__ == '__main__':
         cfg = json.load(r)
     print(cfg)
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input', type=str, default='/media/video/test.avi')
-    parser.add_argument('--cfg-pa', type=str, default='../config')
+    parser.add_argument('--input', type=str, default=os.path.abspath('/media/video/test.avi'))
+    parser.add_argument('--cfg-pa', type=str, default=os.path.abspath('../config'))
+    parser.add_argument('--use-model', type=bool, default=True)
 
 
     args = parser.parse_args()

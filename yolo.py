@@ -30,9 +30,13 @@ if('tensorflow' == K.backend()):
     sess = tf.Session(config=config)
 
 class YOLO(object):
-    def __init__(self,class_path = '../model_data/coco_classes.txt', model_path='../model_data/yolo.h5'):
+    ROOT = '/home/lyz/Desktop/ICBC/'
+    def __init__(self
+                 ,class_path = ROOT+'model_data/coco_classes.txt'
+                 , model_path=ROOT+'model_data/yolo.h5'
+                 , anchor_path= ROOT + 'model_data/yolo_anchors.txt'):
         self.model_path = model_path
-        self.anchors_path = '../model_data/yolo_anchors.txt'
+        self.anchors_path = anchor_path
         self.classes_path = class_path
         #具体参数可实验后进行调整
         if args["class"] == 'person':
@@ -57,7 +61,7 @@ class YOLO(object):
 
     def _get_class(self):
         classes_path = os.path.expanduser(self.classes_path)
-        with open(classes_path) as f:
+        with open(classes_path, 'r') as f:
             class_names = f.readlines()
         class_names = [c.strip() for c in class_names]
         #print(class_names)
@@ -83,6 +87,8 @@ class YOLO(object):
             self.yolo_model = load_model(model_path, compile=False)
         except:
             self.yolo_model = yolo_body(Input(shape=(None, None, 3)), num_anchors // 3, num_classes)
+            print(os.path.abspath('.'))
+            print(os.path.abspath(self.model_path))
             self.yolo_model.load_weights(self.model_path)
         else:
             assert self.yolo_model.layers[-1].output_shape[-1] == \

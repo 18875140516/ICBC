@@ -187,8 +187,10 @@ class Track:
             pass
         else:
             if self.startArea is not None and self.startArea != area:
+                sa = self.startArea
                 self.startArea = area
-                return time.strftime('%Y%m%d%H%M'), self.startArea, area
+
+                return time.strftime('%Y%m%d%H%M'), sa, area
             elif self.startArea is not None and self.startArea == area:
                 return None
             else:

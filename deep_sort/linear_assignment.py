@@ -61,9 +61,9 @@ def min_cost_matching(
         inter_matrix = cost_matrix
     elif debug == 'iou':
         iou_matrix = cost_matrix
-    print('-------------')
-    print(debug)
-    print(cost_matrix)
+    # print('-------------')
+    # print(debug)
+    # print(cost_matrix)
 
     indices = linear_assignment(cost_matrix)
 
@@ -137,7 +137,7 @@ def matching_cascade(
 
         if len(unmatched_detections) == 0:  # No detections left
             break
-        print('level = ', level)
+        # print('level = ', level)
         #todo: 可以尝试一下换用其他方式的更新策略，而不是这种越靠近当前时间的轨迹越优先匹配的方法
         track_indices_l = [
             k for k in track_indices

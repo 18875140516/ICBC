@@ -1,14 +1,12 @@
 import sys
-print(sys.path)
-sys.path.append('../')
-print(sys.path)
 from yolo import YOLO
 import cv2
 import json
 import os
 from PIL import Image
-from util.util import checkPoint
+from utils.util import checkPoint
 import argparse
+
 
 OK = True
 
@@ -56,7 +54,8 @@ if __name__ == '__main__':
     with open('../config/queue.json', 'r') as f:
         cfg = json.load(f)
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default='../model_data/yolo.h5')
-    parser.add_argument('--classpath', type=str, default='../model_data/coco_classes.txt')
+    parser.add_argument('--model', type=str, default=os.path.abspath('../model_data/yolo.h5'))
+    parser.add_argument('--classpath', type=str, default=os.path.abspath('../model_data/coco_classes.txt'))
+    parser.add_argument('--anchorpath', type=str, default=os.path.abspath('../model_data/yolo_anchors.txt'))
     args = parser.parse_args()
-    main(YOLO(model_path=args.model,class_path=args.classpath), cfg)
+    main(YOLO(model_path=args.model,class_path=args.classpath, anchor_path=args.anchorpath), cfg)

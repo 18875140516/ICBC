@@ -25,7 +25,7 @@ from mgn.network import MGN
 # from coordinate_transform import CoordTrans
 from mgn.utils.extract_feature import extract_feature
 from yolo import YOLO
-from util.util import checkPoint
+from utils.util import checkPoint
 # from debug_cost_mat import *
 warnings.filterwarnings('ignore')
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
@@ -112,6 +112,12 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
     metric = nn_matching.NearestNeighborDistanceMetric("mgn", 0.3, nn_budget)
     tracker = Tracker(metric, usemodel='mgn')
 
+    debug_move = np.zeros(shape=(3, 3), dtype=np.int)
+    area_hash = dict()
+    for idd, area in enumerate(cfg['areaNames']):
+            area_hash[area] = idd
+
+
     while True:
         t1 = time.time()
         if writeVideo_flag:
@@ -133,9 +139,14 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
         # for i in range(len(cfg['area'])):
         #     cv2.line(frame, tuple(cfg['area'][i]), tuple(cfg['area'][(i+1)%len(cfg['area'])]),(0,0,255), thickness=2)
         for area in cfg['areaNames']:
+            pt = [0, 0]
             for i in range(len(cfg[area])):
+                pt[0] += cfg[area][i][0]
+                pt[1] += cfg[area][i][1]
                 cv2.line(frame, tuple(cfg[area][i]), tuple(cfg[area][(i + 1) % len(cfg[area])]), (0, 0, 255),
                          thickness=2)
+            pt = [i//len(cfg[area]) for i in pt]
+            cv2.putText(frame, area, tuple(pt), cv2.FONT_HERSHEY_PLAIN, fontScale=2, color=(0,0,255), thickness=2 )
 
         det_frame = frame.copy()
         # for id, det in enumerate(detections):
@@ -160,19 +171,33 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
             ret = track.update_area(curArea)
             if ret is not None:
                 ti, fr, to = ret
-                cv2.putText(frame, fr+'->'+to, (50,50), cv2.FONT_HERSHEY_PLAIN, fontScale=2, color=(0,0,255))
+                print('track: ', track.track_id, "from",fr+'->'+to)
+                debug_move[area_hash[fr]][area_hash[to]] += 1
+                # cv2.putText(frame, fr+'->'+to, (50,50), cv2.FONT_HERSHEY_PLAIN, fontScale=2, color=(0,0,255))
             # track.update_time(checkPoint(((tlbr[0]+tlbr[2])//2, tlbr[3]),cfg['area']))
 
+        hh = 20
+        for fr in cfg['areaNames']:
+            for to in cfg['areaNames']:
+                if fr != to:
+                    cv2.putText(frame, fr+'->'+to+':'+str(debug_move[area_hash[fr]][area_hash[to]]),
+                                (50, hh), cv2.FONT_HERSHEY_PLAIN, 2, (0,0,255), thickness=2)
+                    hh += 25
+
+        # cv2.putText(frame, 'area 1->2 : ' + str(debug_move[area_hash['area1']['area2']]) ,)
         for track in tracker.tracks:
             if not track.is_confirmed() or track.time_since_update > 1:  # 这个地方表示最近两帧中的对象都显示出来
                 continue
             color = COLORS[track.track_id % 200]
             bbox = track.to_tlbr()
             cv2.rectangle(frame, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (0, 255, 0), 2)
-            cv2.putText(frame, str(track.standing_time()) + 's', (int(bbox[0]), int(bbox[1])-20), 0, 5e-3 * 200, (0, 255, 0), 2)
-            # cv2.putText(frame, str(track.track_id), (int(bbox[0]), int(bbox[1])), 0, 5e-3 * 200, (0, 255, 0), 2)
+            # cv2.putText(frame, str(track.standing_time()) + 's', (int(bbox[0]), int(bbox[1])-20), 0, 5e-3 * 200, (0, 255, 0), 4)
+
+            cv2.putText(frame, str(track.track_id), (int(bbox[0]), int(bbox[1])), 0, 5e-3 * 200, (0, 255, 0), 2)
         cv2.imshow('win', frame)
+        cv2.imwrite('/media/lyz/9E3B-0828/12-18/{:06d}.jpg'.format(idx),frame)
         fps = (fps + (1. / (time.time() - t1))) / 2
+        idx += 1
         if cv2.waitKey(30) == ord('q'):
             break
 
