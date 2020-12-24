@@ -40,9 +40,9 @@ def main(yolo, cfg):
         for i in range(len(points)):
             cv2.line(cp, tuple(points[i]), tuple(points[(i+1)%len(points)]), (0, 0, 255), thickness=2)
         if queueSize >= maxQueueSize:
-            cv2.putText(cp, 'too much perple', (200, 50), cv2.FONT_HERSHEY_SCRIPT_SIMPLEX, 1, (0, 0, 255),
+            cv2.putText(cp, 'too much perple', (200, 50), cv2.FONT_HERSHEY_PLAIN, 2, (0, 0, 255),
                         thickness=2)
-        cv2.putText(cp,'queue: '+str(queueSize), (50,50), cv2.FONT_HERSHEY_SCRIPT_SIMPLEX, 1, (255,255,255), thickness=2)
+        cv2.putText(cp,'queue: '+str(queueSize), (50,50), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), thickness=2)
         cv2.imshow('win', cp)
         q = cv2.waitKey(30)
         if q == ord('q'):
