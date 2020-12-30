@@ -21,7 +21,7 @@ def main(yolo, cfg):
             print(checkPoint((x, y), points))
     cv2.namedWindow('win')
     cv2.setMouseCallback('win', onMousecb)
-
+    idx = 0
     while OK:
         ret, frame = cap.read()
         if ret == False:
@@ -47,6 +47,9 @@ def main(yolo, cfg):
         q = cv2.waitKey(30)
         if q == ord('q'):
             break
+        elif q == ord('x'):
+            cv2.imwrite('{:04d}.jpg'.format(idx), cp)
+        idx += 1
     pass
 
 

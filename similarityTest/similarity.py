@@ -175,8 +175,11 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
         cv2.imshow('win', frame)
         fps = (time.time() - t1)*1000
         print(fps)
-        if cv2.waitKey(30) == ord('q'):
+        q = cv2.waitKey(30)
+        if q == ord('q'):
             break
+        elif q == ord('x'):
+            cv2.imwrite('{:04d}.jpg'.format(idx), frame)
 
 
         # if writeVideo_flag:

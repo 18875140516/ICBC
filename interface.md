@@ -21,14 +21,14 @@
 ####后端接口
 |接口名称|请求内容|接口介绍|请求类型|
 |---|---|---|---|
-|setQueueSize| |设置最大等待人数|get|
-|setEntrySize| |设置最大进入人数|get|
-|setBankCapacity| |设置最大停留人数|get|
-|setWaitTime| |设置最长停留时间|get|
-|setWaitNumber| |设置最大等待人数|get|
-|setLeaveTime| |设置最长离岗时间|get|
-|setContactTime| |设置最长两人接触时间|get|
-|getLastWeekNum| |获取最近七天人数|post|
+|setQueueSize|{'queueSize':12}|设置最大等待人数|get|
+|setEntrySize|{'entrySize':13}|设置最大进入人数|get|
+|setBankCapacity|{'bankCapacity': 34}|设置最大停留人数|get|
+|setWaitTime|{'waitTime':12}|设置最长停留时间(min)|get|
+|setWaitNumber|{'waitNumber':23}|设置最大等待人数|get|
+|setLeaveTime|{'leaveTime':12}|设置最长离岗时间(min)|get|
+|setContactTime|{'contactTime': 12}|设置最长两人接触时间(min)|get|
+|getLastWeekNum| |获取最近七天人数|get|
 |backgroundShot| |遗留物品检测背景拍摄|get|
 
 ##三、对接接口格式
