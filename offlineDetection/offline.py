@@ -10,7 +10,9 @@ import json
 import os
 import time
 import warnings
-
+import sys
+sys.path.append(os.path.abspath(os.getcwd()))
+print(sys.path)
 import cv2
 import numpy as np
 import torch
@@ -25,16 +27,22 @@ from mgn.network import MGN
 # from coordinate_transform import CoordTrans
 from mgn.utils.extract_feature import extract_feature
 from yolo import YOLO
-from utils.util import checkPoint
+from utils.util import checkPoint, compute_iou
 import paho.mqtt.publish as publish
+import paho.mqtt.client as mqtt
+import threading
+import json
 # from debug_cost_mat import *
+
 warnings.filterwarnings('ignore')
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 COLORS = np.random.randint(0, 255, size=(200, 3), dtype="uint8")
-
+MQTT_URL = '127.0.0.1'
 startTrack = False
 tracked = False
 clickPoint = None
+WIDTH = None
+HEIGHT = None
 def load_model_pytorch(model_path):
     model = MGN()
     model = model.to('cuda')
@@ -87,6 +95,46 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
     global startTrack
     global tracked
     global clickPoint
+    global HEIGHT
+    global WIDTH
+    def listenMQ():
+
+    #从消息队列获得信息，然后改变当前状态
+        def on_connect(client, userdata, flags, rc):
+            print("Connected with result code " + str(rc))
+
+            # Subscribing in on_connect() means that if we lose the connection and
+            # reconnect then subscriptions will be renewed.
+            client.subscribe(topic='selectPerson')
+            print('subscribe selectPerson successfully')
+
+        # The callback for when a PUBLISH message is received from the server.
+        def on_message(client, userdata, msg):
+            global startTrack
+            global tracked
+            global clickPoint
+            global WIDTH
+            global HEIGHT
+            startTrack = True
+            ret = json.loads(msg.payload)
+            x = int(WIDTH*float(ret['x']))
+            y = int(HEIGHT*float(ret['y']))
+            print('x=',x, 'y=',y)
+            clickPoint = (x, y)
+
+            tracked = False
+            print(msg.payload)
+
+        client = mqtt.Client()
+        client.on_connect = on_connect
+        client.on_message = on_message
+        print('starting connecting')
+        ret = client.connect(MQTT_URL, 1883, 60)
+        print(ret)
+        print('ending connecting')
+        client.loop_forever()
+    sub_thread = threading.Thread(target=listenMQ)
+    sub_thread.start()
     # Definition of the parameters
     max_cosine_distance = 0.3  # 允许相同人的最大余弦距离0.3
     nn_budget = None
@@ -120,16 +168,20 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
     fps = 0.0
 
     cap = cv2.VideoCapture(args.input)
-
+    HEIGHT = cap.get(4)
+    WIDTH = cap.get(3)
     idx = 1
-    metric = nn_matching.NearestNeighborDistanceMetric("mgn", 0.3, nn_budget)
     target = None
+    records = []
+    old_bbox = None
+    old_lost_time = 0
     while True:
-        # print(clickPoint)
         ret, img = cap.read()
+        # img = cv2.resize(img, ( img.shape[1]//2,img.shape[0]//2))
         if ret == False:
-            print('read error')
-            break
+            print('read OK')
+            cap = cv2.VideoCapture(args.input)
+            ret, img = cap.read()
         boxs, classname = yolo.detect_image(Image.fromarray(img[...,::-1]))
         features = box_encode(mgn, Image.fromarray(img[..., ::-1]), boxs, prefix='./img1')
         detections = [Detection(bbox, 1.0, feature) for bbox, feature in zip(boxs, features)]
@@ -142,15 +194,17 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
             for det in detections:
                 bbox = det.tlwh.copy()
                 bbox[2:] += bbox[:2]
+                records.append(det.feature)
                 if clickPoint[0] > bbox[0] \
                     and clickPoint[0] < bbox[2]\
                     and clickPoint[1] > bbox[1]\
                     and clickPoint[1] < bbox[3]:
                     print('found it')
+                    old_bbox = bbox
                     target = det
                     tracked = True
                     break
-        elif startTrack  and tracked :#filter extra detection
+        elif startTrack and tracked: #filter extra detection
             dis = []
             for i, det in enumerate(detections):
                 bbox = det.tlwh.copy()
@@ -158,25 +212,65 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
                 dis.append((i, np.dot(target.feature, det.feature)))
 
             dis.sort(key=lambda x: x[1], reverse=True)
-            if dis[0][1] <  0.85:
-                continue
-            # print(len(dis), dis)
-            bbox = detections[dis[0][0]].tlwh.copy()
-            bbox[2:] += bbox[:2]
-            cv2.rectangle(img, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 255), 2)
+            matched = False
+            for i in range(len(dis)):
+                #check if near old_bbox
+                check_id = dis[i][0]
+                cmp_bbox = detections[check_id].tlwh.copy()
+                cmp_bbox[2:] += cmp_bbox[:2]
 
-            pass
+                def check_if_append(detections, check_id):
+                    print('checking')
+                    MARGIN = 0
+                    check_box = detections[check_id].tlwh.copy()
+                    check_box[2:] += check_box[:2]
+                    check_box = [check_box[0] - MARGIN, check_box[1] - MARGIN, check_box[2] + MARGIN,
+                                 check_box[3] + MARGIN]
+                    for i, det in enumerate(detections):
+                        if i == check_id:
+                            continue
+                        _bbox = det.tlwh.copy()
+                        _bbox[2:] += _bbox[:2]
+                        iou = compute_iou(_bbox, check_box)
+                        print(iou)
+
+                    pass
+
+                if old_bbox is not None and compute_iou(old_bbox, cmp_bbox) < 0.01:
+                    continue
+
+                if dis[i][1] >= 0.80:
+
+                    #consider appending records when closed det appears
+
+                    bbox = detections[dis[0][0]].tlwh.copy()
+                    bbox[2:] += bbox[:2]
+
+                    check_if_append(detections, dis[i][0])
+                    cv2.rectangle(img, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 255), 2)
+                    if old_bbox is not None:
+                        cv2.rectangle(img, (int(old_bbox[0]), int(old_bbox[1])), (int(old_bbox[2]), int(old_bbox[3])), (0, 0, 255), 2)
+                    old_bbox = bbox.copy()
+                    matched = True
+                break
+            if matched == False:
+                old_lost_time+=1
+                if old_lost_time >= 5:
+                    old_bbox = None
+
         else:
             for id, det in enumerate(detections):
                 bbox = det.tlwh.copy()
                 bbox[2:] += bbox[:2]
                 # print(bbox)
                 cv2.rectangle(img, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 255), 2)
-
-        cv2.imshow('win', img)
-        cv2.waitKey(20)
+        cv2.imwrite('/media/offline.jpg', img)
+        publish.single('offlineImage',payload='x', hostname=MQTT_URL)
+        # cv2.imshow('win', img)
+        # cv2.waitKey(30)
         # pass
     cv2.destroyAllWindows()
+    sub_thread.join()
 
 if __name__ == '__main__':
     with open('../config/standing.json', 'r') as r:
@@ -184,6 +278,7 @@ if __name__ == '__main__':
     print(cfg)
     parser = argparse.ArgumentParser()
     parser.add_argument('--input', type=str, default=os.path.abspath('/media/video/test.avi'))
+    # parser.add_argument('--input', type=str, default=os.path.abspath('/media/video/ch74_2020-05-27-090034.mp4'))
     parser.add_argument('--cfg-pa', type=str, default=os.path.abspath('../config'))
     parser.add_argument('--use-model', type=bool, default=True)
 

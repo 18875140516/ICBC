@@ -17,20 +17,24 @@
 |leftover|{‘name':'bag','img':'base64image'}|遗留物品检测|
 |managerStatus|{'status':'在岗/暂离/离岗'}|大堂经理状态|
 |numRegion|{'infos':[{'name':'region1','numPerson':12,'avgStayTime':123},]}|区域对应的人数|
+|offlineImage| base64 image|用于发送图片，与selectPerson搭配实现点击触发追踪|
 以上均采用websocket与消息队列实现前后端信息推送,各模型负责部分应将统计数据发至消息队列指定topic
 ####后端接口
 |接口名称|请求内容|接口介绍|请求类型|
 |---|---|---|---|
-|setQueueSize|{'queueSize':12}|设置最大等待人数|get|
-|setEntrySize|{'entrySize':13}|设置最大进入人数|get|
-|setBankCapacity|{'bankCapacity': 34}|设置最大停留人数|get|
-|setWaitTime|{'waitTime':12}|设置最长停留时间(min)|get|
-|setWaitNumber|{'waitNumber':23}|设置最大等待人数|get|
-|setLeaveTime|{'leaveTime':12}|设置最长离岗时间(min)|get|
-|setContactTime|{'contactTime': 12}|设置最长两人接触时间(min)|get|
-|getLastWeekNum| |获取最近七天人数|get|
-|backgroundShot| |遗留物品检测背景拍摄|get|
+|setQueueSize|{'queueSize':12}|设置最大等待人数| |
+|setEntrySize|{'entrySize':13}|设置最大进入人数| |
+|setBankCapacity|{'bankCapacity': 34}|设置最大停留人数| |
+|setWaitTime|{'waitTime':12}|设置最长停留时间(min)| |
+|setWaitNumber|{'waitNumber':23}|设置最大等待人数| |
+|setLeaveTime|{'leaveTime':12}|设置最长离岗时间(min)| |
+|setContactTime|{'contactTime': 12}|设置最长两人接触时间(min)| |
+|getLastWeekNum| |获取最近七天人数| |
+|backgroundShot| |遗留物品检测背景拍摄| |
+|selectPerson|{'x': '0.12', 'y': '0.5'}|将前端选择的目标对应位置发到后端|post|
+
+
 
 ##三、对接接口格式
 ###四、报警类别及对应标识
-
+<kbd>dasd</kbd>
