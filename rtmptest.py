@@ -1,7 +1,8 @@
 import cv2
 import subprocess
 import time
-rtmp = r'rtmp://211.67.20.74:1935/myapp'
+rtmp = r'rtmp://127.0.0.1:1935/myapp'
+rtmp2 = r'rtmp://127.0.0.1:1935/hls/test2'
 cap = cv2.VideoCapture('/media/video/test.avi')
 size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
 sizeStr = str(size[0]) + 'x' + str(size[1])
@@ -17,16 +18,17 @@ command = ['ffmpeg',
            '-pix_fmt', 'yuv420p',
            '-preset', 'ultrafast',
            '-f', 'flv',
-           rtmp]
+           rtmp2]
 pipe = subprocess.Popen(command, shell=False, stdin=subprocess.PIPE)
 idx = 1
 while cap.isOpened():
     success, frame = cap.read()
     if success:
-        # time.sleep(0.2)
+        # time.sleep(0.5)
         # cv2.waitKey(40)
-        for i in range(1000000):
-            pass
+        cv2.putText(frame, str(idx), (50,50), cv2.FONT_HERSHEY_PLAIN, fontScale=3, color=(0,0,255), thickness=3)
+        # cv2.imshow('img', frame)
+        # cv2.waitKey(20)
         pipe.stdin.write(frame.tostring())
         print(idx)
         idx += 1

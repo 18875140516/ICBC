@@ -3,7 +3,7 @@
 
 from __future__ import division, print_function, absolute_import
 import sys
-print(sys.path)
+# print(sys.path)
 sys.path.append('../')
 import argparse
 import json
@@ -12,7 +12,7 @@ import time
 import warnings
 import sys
 sys.path.append(os.path.abspath(os.getcwd()))
-print(sys.path)
+# print(sys.path)
 import cv2
 import numpy as np
 import torch
@@ -34,6 +34,8 @@ import threading
 import json
 # from debug_cost_mat import *
 
+DEBUG_MODE = False
+
 warnings.filterwarnings('ignore')
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 COLORS = np.random.randint(0, 255, size=(200, 3), dtype="uint8")
@@ -43,6 +45,7 @@ tracked = False
 clickPoint = None
 WIDTH = None
 HEIGHT = None
+LAST_APPEAR = None  # 记录上一次出现的时间
 def load_model_pytorch(model_path):
     model = MGN()
     model = model.to('cuda')
@@ -97,44 +100,50 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
     global clickPoint
     global HEIGHT
     global WIDTH
-    def listenMQ():
+    global LAST_APPEAR
+    managerStat = 'online'
+    if not DEBUG_MODE:
+        def listenMQ():
 
-    #从消息队列获得信息，然后改变当前状态
-        def on_connect(client, userdata, flags, rc):
-            print("Connected with result code " + str(rc))
+        #从消息队列获得信息，然后改变当前状态
+            def on_connect(client, userdata, flags, rc):
+                print("Connected with result code " + str(rc))
 
-            # Subscribing in on_connect() means that if we lose the connection and
-            # reconnect then subscriptions will be renewed.
-            client.subscribe(topic='selectPerson')
-            print('subscribe selectPerson successfully')
+                # Subscribing in on_connect() means that if we lose the connection and
+                # reconnect then subscriptions will be renewed.
+                client.subscribe(topic='selectPerson')
+                print('subscribe selectPerson successfully')
 
-        # The callback for when a PUBLISH message is received from the server.
-        def on_message(client, userdata, msg):
-            global startTrack
-            global tracked
-            global clickPoint
-            global WIDTH
-            global HEIGHT
-            startTrack = True
-            ret = json.loads(msg.payload)
-            x = int(WIDTH*float(ret['x']))
-            y = int(HEIGHT*float(ret['y']))
-            print('x=',x, 'y=',y)
-            clickPoint = (x, y)
+            # The callback for when a PUBLISH message is received from the server.
+            def on_message(client, userdata, msg):
+                global startTrack
+                global tracked
+                global clickPoint
+                global WIDTH
+                global HEIGHT
+                global LAST_APPEAR
+                startTrack = True
+                print('reveive msg', msg.payload)
+                ret = json.loads(msg.payload)
+                x = int(WIDTH*float(ret['x']))
+                y = int(HEIGHT*float(ret['y']))
+                print('x=',x, 'y=',y)
+                clickPoint = (x, y)
+                LAST_APPEAR = time.time()
+                tracked = False
+                print(msg.payload)
 
-            tracked = False
-            print(msg.payload)
+            client = mqtt.Client()
+            client.on_connect = on_connect
+            client.on_message = on_message
+            print('starting connecting')
+            ret = client.connect(MQTT_URL, 1883, 60)
+            print(ret)
+            print('ending connecting')
+            client.loop_forever()
+        sub_thread = threading.Thread(target=listenMQ)
+        sub_thread.start()
 
-        client = mqtt.Client()
-        client.on_connect = on_connect
-        client.on_message = on_message
-        print('starting connecting')
-        ret = client.connect(MQTT_URL, 1883, 60)
-        print(ret)
-        print('ending connecting')
-        client.loop_forever()
-    sub_thread = threading.Thread(target=listenMQ)
-    sub_thread.start()
     # Definition of the parameters
     max_cosine_distance = 0.3  # 允许相同人的最大余弦距离0.3
     nn_budget = None
@@ -149,20 +158,18 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
     test_video_flag = True
     writeVideo_flag = False  # 是否写入视频
 
+    if DEBUG_MODE:
+        cv2.namedWindow('win')
+        def clickCB(event, x, y, flag, param):
 
-    cv2.namedWindow('win')
-
-
-    def clickCB(event, x, y, flag, param):
-
-        if event == cv2.EVENT_LBUTTONDOWN:
-            global startTrack
-            global clickPoint
-            global tracked
-            startTrack = True
-            clickPoint = (x, y)
-            tracked = False
-    cv2.setMouseCallback('win',clickCB)
+            if event == cv2.EVENT_LBUTTONDOWN:
+                global startTrack
+                global clickPoint
+                global tracked
+                startTrack = True
+                clickPoint = (x, y)
+                tracked = False
+        cv2.setMouseCallback('win',clickCB)
 
 
     fps = 0.0
@@ -204,6 +211,7 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
                     target = det
                     tracked = True
                     break
+
         elif startTrack and tracked: #filter extra detection
             dis = []
             for i, det in enumerate(detections):
@@ -220,7 +228,7 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
                 cmp_bbox[2:] += cmp_bbox[:2]
 
                 def check_if_append(detections, check_id):
-                    print('checking')
+                    # print('checking')
                     MARGIN = 0
                     check_box = detections[check_id].tlwh.copy()
                     check_box[2:] += check_box[:2]
@@ -232,7 +240,7 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
                         _bbox = det.tlwh.copy()
                         _bbox[2:] += _bbox[:2]
                         iou = compute_iou(_bbox, check_box)
-                        print(iou)
+                        # print(iou)
 
                     pass
 
@@ -253,10 +261,23 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
                     old_bbox = bbox.copy()
                     matched = True
                 break
+
             if matched == False:
+                print('lost ', time.time() - LAST_APPEAR, 's')
+                if time.time() - LAST_APPEAR > 10:
+                    managerStat = 'offline'
+                else:
+                    managerStat = 'leave'
                 old_lost_time+=1
                 if old_lost_time >= 5:
                     old_bbox = None
+            else:
+                LAST_APPEAR = time.time()
+                managerStat = 'online'
+
+                print('refound the target')
+            if DEBUG_MODE:
+                cv2.putText(img, managerStat, (50, 50), cv2.FONT_HERSHEY_PLAIN, fontScale=3, thickness=3, color=(0, 0, 255))
 
         else:
             for id, det in enumerate(detections):
@@ -264,18 +285,27 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
                 bbox[2:] += bbox[:2]
                 # print(bbox)
                 cv2.rectangle(img, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 255), 2)
-        cv2.imwrite('/media/offline.jpg', img)
-        publish.single('offlineImage',payload='x', hostname=MQTT_URL)
-        # cv2.imshow('win', img)
-        # cv2.waitKey(30)
+
+        if not DEBUG_MODE:
+            cv2.imwrite('/media/img/offline.jpg', img)
+            publish.single('offlineImage',payload='x', hostname=MQTT_URL)
+        if DEBUG_MODE:
+            cv2.imshow('win', img)
+            cv2.imwrite('/home/lyz/imgs/{:04d}.jpg'.format(idx), img)
+            q = cv2.waitKey(30)
+            if q == ord('q'):
+                break
+        idx += 1
         # pass
-    cv2.destroyAllWindows()
-    sub_thread.join()
+
+    if not DEBUG_MODE:
+        cv2.destroyAllWindows()
+        sub_thread.join()
 
 if __name__ == '__main__':
     with open('../config/standing.json', 'r') as r:
         cfg = json.load(r)
-    print(cfg)
+    # print(cfg)
     parser = argparse.ArgumentParser()
     parser.add_argument('--input', type=str, default=os.path.abspath('/media/video/test.avi'))
     # parser.add_argument('--input', type=str, default=os.path.abspath('/media/video/ch74_2020-05-27-090034.mp4'))

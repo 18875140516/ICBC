@@ -1,5 +1,5 @@
 import cv2
-url = 'rtmp://211.67.20.74:1935/myapp'
+url = 'http://127.0.0.1:8081/hls/test2.m3u8'
 cap = cv2.VideoCapture(url)
 if cap.isOpened():
     print('open successfully')
