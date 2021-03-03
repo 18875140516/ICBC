@@ -34,7 +34,7 @@ import threading
 import json
 # from debug_cost_mat import *
 
-DEBUG_MODE = False
+DEBUG_MODE = True
 
 warnings.filterwarnings('ignore')
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
@@ -104,7 +104,6 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
     managerStat = 'online'
     if not DEBUG_MODE:
         def listenMQ():
-
         #从消息队列获得信息，然后改变当前状态
             def on_connect(client, userdata, flags, rc):
                 print("Connected with result code " + str(rc))
@@ -184,6 +183,7 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
     old_lost_time = 0
     while True:
         ret, img = cap.read()
+        img = cv2.resize(img, dsize=(720, 480))
         # img = cv2.resize(img, ( img.shape[1]//2,img.shape[0]//2))
         if ret == False:
             print('read OK')
@@ -255,9 +255,12 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
                     bbox[2:] += bbox[:2]
 
                     check_if_append(detections, dis[i][0])
-                    cv2.rectangle(img, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 255), 2)
+                    # bbox[1] -= (bbox[3]-bbox[1])/6
+                    cv2.rectangle(img, (int(bbox[0]), int(bbox[1]+(bbox[3]-bbox[1])/6)), (int(bbox[2]), int(bbox[3])), (0, 0, 255), 2)
+                    # cv2.rectangle(img, (int(bbox[0]), int(bbox[1]), (int(bbox[2]), int(bbox[3])), (255, 255, 255), 2)
                     if old_bbox is not None:
-                        cv2.rectangle(img, (int(old_bbox[0]), int(old_bbox[1])), (int(old_bbox[2]), int(old_bbox[3])), (0, 0, 255), 2)
+                        # cv2.rectangle(img, (int(old_bbox[0]), int(old_bbox[1])), (int(old_bbox[2]), int(old_bbox[3])), (255, 255, 255), 2)
+                        pass
                     old_bbox = bbox.copy()
                     matched = True
                 break
@@ -307,7 +310,7 @@ if __name__ == '__main__':
         cfg = json.load(r)
     # print(cfg)
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input', type=str, default=os.path.abspath('/media/video/test.avi'))
+    parser.add_argument('--input', type=str, default=os.path.abspath('/media/video/ch35_.mp4'))
     # parser.add_argument('--input', type=str, default=os.path.abspath('/media/video/ch74_2020-05-27-090034.mp4'))
     parser.add_argument('--cfg-pa', type=str, default=os.path.abspath('../config'))
     parser.add_argument('--use-model', type=bool, default=True)
