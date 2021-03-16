@@ -30,7 +30,7 @@ if('tensorflow' == K.backend()):
     sess = tf.Session(config=config)
 
 class YOLO(object):
-    ROOT = '/home/lyz/Desktop/ICBC/'
+    ROOT = '/home/liuyongzhi/ICBC/'
     def __init__(self
                  ,class_path = ROOT+'model_data/coco_classes.txt'
                  , model_path=ROOT+'model_data/yolo.h5'

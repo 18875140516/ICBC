@@ -18,7 +18,7 @@ import numpy as np
 import torch
 from PIL import Image
 from torchvision import transforms
-
+import base64
 from deep_sort import nn_matching
 from deep_sort import preprocessing
 from deep_sort.detection import Detection
@@ -31,21 +31,27 @@ from utils.util import checkPoint, compute_iou
 import paho.mqtt.publish as publish
 import paho.mqtt.client as mqtt
 import threading
+from configRetrive import ConfigRetrive
+from utils.util import checkPoint
 import json
+import logging
 # from debug_cost_mat import *
 
-DEBUG_MODE = True
 
 warnings.filterwarnings('ignore')
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 COLORS = np.random.randint(0, 255, size=(200, 3), dtype="uint8")
-MQTT_URL = '127.0.0.1'
+MQTT_URL = '211.67.21.65'
+online_config = ConfigRetrive()
 startTrack = False
 tracked = False
 clickPoint = None
 WIDTH = None
 HEIGHT = None
-LAST_APPEAR = None  # 记录上一次出现的时间
+LAST_APPEAR = 0  # 记录上一次出现的时间
+USE_MQTT = True
+USE_IMSHOW = False
+USE_PATTERN = True
 def load_model_pytorch(model_path):
     model = MGN()
     model = model.to('cuda')
@@ -102,7 +108,7 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
     global WIDTH
     global LAST_APPEAR
     managerStat = 'online'
-    if not DEBUG_MODE:
+    if USE_MQTT:
         def listenMQ():
         #从消息队列获得信息，然后改变当前状态
             def on_connect(client, userdata, flags, rc):
@@ -131,7 +137,6 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
                 LAST_APPEAR = time.time()
                 tracked = False
                 print(msg.payload)
-
             client = mqtt.Client()
             client.on_connect = on_connect
             client.on_message = on_message
@@ -157,7 +162,7 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
     test_video_flag = True
     writeVideo_flag = False  # 是否写入视频
 
-    if DEBUG_MODE:
+    if USE_IMSHOW:
         cv2.namedWindow('win')
         def clickCB(event, x, y, flag, param):
 
@@ -165,8 +170,9 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
                 global startTrack
                 global clickPoint
                 global tracked
-                startTrack = True
                 clickPoint = (x, y)
+                startTrack = True
+                print(clickPoint)
                 tracked = False
         cv2.setMouseCallback('win',clickCB)
 
@@ -182,22 +188,67 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
     old_bbox = None
     old_lost_time = 0
     while True:
+        start = time.clock()
         ret, img = cap.read()
-        img = cv2.resize(img, dsize=(720, 480))
+        if not ret:
+            cap = cv2.VideoCapture(args.input)
+            ret, img = cap.read()
+        # img = cv2.resize(img,(720, 480))
+        # print(img.shape)
+        default_area = [[112, 271], [243, 488], [650, 431], [480, 230]]
+        default_area = [[x[0]/img.shape[1], x[1]/img.shape[0]] for x in default_area]
+        area = online_config.get('entry', default_area)
+        area = [[int(x[0] * img.shape[1]), int(x[1] * img.shape[0])] for x in area]
         # img = cv2.resize(img, ( img.shape[1]//2,img.shape[0]//2))
         if ret == False:
-            print('read OK')
+            # print('read OK')
             cap = cv2.VideoCapture(args.input)
             ret, img = cap.read()
         boxs, classname = yolo.detect_image(Image.fromarray(img[...,::-1]))
+        # print('yolov3 time(s): ', time.clock() - start)
         features = box_encode(mgn, Image.fromarray(img[..., ::-1]), boxs, prefix='./img1')
+        # features = np.zeros(shape=(2048, 1))
+        #todo: 特征提取后移,等选定了模板或选定的人后,在进行特征提取
+
         detections = [Detection(bbox, 1.0, feature) for bbox, feature in zip(boxs, features)]
         boxes = np.array([d.tlwh for d in detections])
         scores = np.array([d.confidence for d in detections])
         indices = preprocessing.non_max_suppression(boxes, nms_max_overlap, scores)
         detections = [detections[i] for i in indices]
+        # print('get detection time(s): ', time.clock() - start)
+
+        #排除所选框外的detection
+        det_out = []
+        det_in = []
+        for det in detections:
+            tlbr = det.to_tlbr()
+            if checkPoint(((tlbr[0] + tlbr[2]) // 2, tlbr[3]), area):
+                det_in.append(det)
+            else:
+                det_out.append(det)
+        for i in range(len(area)):
+            cv2.line(img, tuple(area[i]), tuple(area[(i+1)%len(area)]),(0,0,255), thickness=2)
+        detections = det_in
+
+
+        if USE_PATTERN:
+            logging.info('get manager_pattern')
+            manager_pattern = online_config.get('manager_pattern', None)# byte array
+            print("manager_pattern = ", manager_pattern)
+            if manager_pattern is not None:
+                tracked = True
+                startTrack = True
+                #assign target -> Detection
+                img_base64decode = base64.b64decode(manager_pattern)
+                img_array = np.frombuffer(img_base64decode, np.uint8)
+                img_pattern = cv2.imdecode(img_array, cv2.COLOR_BGR2RGB)
+                fea = box_encode(mgn, Image.fromarray(img_pattern[..., ::-1]),
+                                 [[0, 0, img_pattern.shape[1], img_pattern.shape[0]]])
+                target = Detection([0,0,0,0], 1.0, fea)
+
+        #点击了某个点后进行目标判定
         if tracked == False and startTrack == True: #choose detection
-            # print('1')
+            print('1')
             for det in detections:
                 bbox = det.tlwh.copy()
                 bbox[2:] += bbox[:2]
@@ -211,7 +262,7 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
                     target = det
                     tracked = True
                     break
-
+        #优选最相似目标
         elif startTrack and tracked: #filter extra detection
             dis = []
             for i, det in enumerate(detections):
@@ -266,7 +317,7 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
                 break
 
             if matched == False:
-                print('lost ', time.time() - LAST_APPEAR, 's')
+                # print('lost ', time.time() - LAST_APPEAR, 's')
                 if time.time() - LAST_APPEAR > 10:
                     managerStat = 'offline'
                 else:
@@ -279,9 +330,13 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
                 managerStat = 'online'
 
                 print('refound the target')
-            if DEBUG_MODE:
-                cv2.putText(img, managerStat, (50, 50), cv2.FONT_HERSHEY_PLAIN, fontScale=3, thickness=3, color=(0, 0, 255))
-
+            cv2.putText(img, managerStat, (50, 50), cv2.FONT_HERSHEY_PLAIN, fontScale=3, thickness=3, color=(0, 0, 255))
+            if USE_MQTT:
+                root = dict()
+                root['status'] = managerStat
+                s = json.dumps(root)
+                publish.single(topic='managerStatus', payload=s, hostname=MQTT_URL)
+        #选定前的画面
         else:
             for id, det in enumerate(detections):
                 bbox = det.tlwh.copy()
@@ -289,19 +344,19 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
                 # print(bbox)
                 cv2.rectangle(img, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 255), 2)
 
-        if not DEBUG_MODE:
-            cv2.imwrite('/media/img/offline.jpg', img)
-            publish.single('offlineImage',payload='x', hostname=MQTT_URL)
-        if DEBUG_MODE:
+        if USE_IMSHOW:#所有分支都需要
             cv2.imshow('win', img)
             cv2.imwrite('/home/lyz/imgs/{:04d}.jpg'.format(idx), img)
             q = cv2.waitKey(30)
             if q == ord('q'):
                 break
+        elif USE_MQTT:
+            cv2.imwrite('/media/img/after.jpg', img)
+            s = base64.b64encode(cv2.imencode('.jpg', img)[1])
+            publish.single('offlineImage',payload=s, hostname=MQTT_URL)
         idx += 1
-        # pass
 
-    if not DEBUG_MODE:
+    if USE_IMSHOW:
         cv2.destroyAllWindows()
         sub_thread.join()
 
@@ -310,7 +365,7 @@ if __name__ == '__main__':
         cfg = json.load(r)
     # print(cfg)
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input', type=str, default=os.path.abspath('/media/video/ch35_.mp4'))
+    parser.add_argument('--input', type=str, default=os.path.abspath('/media/video/test.avi'))
     # parser.add_argument('--input', type=str, default=os.path.abspath('/media/video/ch74_2020-05-27-090034.mp4'))
     parser.add_argument('--cfg-pa', type=str, default=os.path.abspath('../config'))
     parser.add_argument('--use-model', type=bool, default=True)

@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
-
+#todo: add queue model to standing time
 from __future__ import division, print_function, absolute_import
 import sys
 print(sys.path)
@@ -26,16 +26,31 @@ from mgn.network import MGN
 from mgn.utils.extract_feature import extract_feature
 from yolo import YOLO
 from utils.util import checkPoint
+from configRetrive import ConfigRetrive
+import base64
+import logging
+from rtmpAgent import RTMP_AGENT
 import paho.mqtt.publish as publish
 # from debug_cost_mat import *
 warnings.filterwarnings('ignore')
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 COLORS = np.random.randint(0, 255, size=(200, 3), dtype="uint8")
+online_config = ConfigRetrive()
+USE_IMSHOW = False
+USE_MQTT = False
+USE_FFMPEG = True
+MQTT_URL = online_config.get('MQTT_URL', '127.0.0.1')
+RTMP_URL = online_config.get("RTMP_URL", "127.0.0.1")
+RTMP_PORT = online_config.get('RTMP_PORT', 1935)
+STANDING_TOPIC = online_config.get('STANDING_TOPIC', "standing")
 
+standing_agent = RTMP_AGENT(rtmp_url=RTMP_URL, rtmp_port=RTMP_PORT, topic=STANDING_TOPIC)
 def load_model_pytorch(model_path):
+    logging.info('loading model pytorch')
     model = MGN()
     model = model.to('cuda')
     model.load_state_dict(torch.load(model_path))
+    logging.info('load ok')
     return model
 
 # def get_feature(model, img_path):
@@ -80,8 +95,8 @@ def box_encode(model, img, boxes, prefix='./img1/'):
     return features.numpy()
 
 
-def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
-
+def main(yolo, args):  # 输入yolov3模型和视频路径
+    logging.info('standing main')
     # Definition of the parameters
     max_cosine_distance = 0.3  # 允许相同人的最大余弦距离0.3
     nn_budget = None
@@ -90,15 +105,12 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
     model_filename = 'model_data/mars-small128.pb'  # 128维特征预测模型，效果不佳，rank1极低
     # encoder = gdet.create_box_encoder(model_filename, batch_size=1)
     # mgn model
-    print('loading mgn model')
     mgn = load_model_pytorch('/home/lyz/Desktop/ReID-MGN/model.pt')
-    print('load mgn OK')
     test_video_flag = True
     writeVideo_flag = False  # 是否写入视频
 
 
     fps = 0.0
-
     cap = cv2.VideoCapture(args.input)
     k = 1
     if writeVideo_flag:
@@ -114,12 +126,25 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
     tracker = Tracker(metric, usemodel='mgn')
 
     while True:
+
+
         t1 = time.time()
         if writeVideo_flag:
             out_img = []
         ret, frame = cap.read()
+
         if ret == False:
-            break
+            cap = cv2.VideoCapture(args.input)
+            ret, frame = cap.read()
+        default_area = [[112, 271], [243, 488], [650, 431], [480, 230]]
+        default_area = [[x[0]/frame.shape[1], x[1]/frame.shape[0]] for x in default_area]
+        area = online_config.get('standing_area', default_area)
+        if type(area) != list or len(area) == 0:
+            continue
+        if max(max(area)) > 1:
+            print('area is not valid')
+            continue
+        area = [[int(x[0]*frame.shape[1]), int(x[1]*frame.shape[0])] for x in area]
         image = Image.fromarray(frame[..., ::-1])  # bgr to rgb
         boxs, classname = yolo.detect_image(image)  # xy w h
         features = box_encode(mgn, Image.fromarray(frame[..., ::-1]), boxs, prefix='./img1')
@@ -133,31 +158,36 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
         det_in = []
         for det in detections:
             tlbr = det.to_tlbr()
-            if checkPoint(((tlbr[0] + tlbr[2])//2, tlbr[3]), cfg['area']):
+            if checkPoint(((tlbr[0] + tlbr[2])//2, tlbr[3]), area):
                 det_in.append(det)
             else:
                 det_out.append(det)
+
+        queueSize = len(det_in)
+
         #draw area
-        for i in range(len(cfg['area'])):
-            cv2.line(frame, tuple(cfg['area'][i]), tuple(cfg['area'][(i+1)%len(cfg['area'])]),(0,0,255), thickness=2)
+        if online_config.get('SHOW_AREA', False):
+            for i in range(len(area)):
+                cv2.line(frame, tuple(area[i]), tuple(area[(i+1)%len(area)]),(0,0,255), thickness=2)
+        cv2.putText(frame, 'queue: ' + str(queueSize), (50, 50), cv2.FONT_HERSHEY_PLAIN, 2, (255, 255, 255), thickness=2)
 
         det_frame = frame.copy()
-        for id, det in enumerate(det_out):
-            bbox = det.tlwh.copy()
-            bbox[2:] += bbox[:2]
-            # print(bbox)
-            cv2.rectangle(frame, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 255), 2)
+        if online_config.get('SHOW_BBOX', False):
+            for id, det in enumerate(det_out):
+                bbox = det.tlwh.copy()
+                bbox[2:] += bbox[:2]
+                # print(bbox)
+                cv2.rectangle(frame, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 255), 2)
 
         detections = det_in
-        # cv2.imshow('det', det_frame)
-        # Call the tracker
         tracker.predict()
         matches, unmatch_det = tracker.update(detections)  # 利用detection更新tracker
         #update tracks status
         for track in tracker.tracks:
             tlbr = track.to_tlbr()
-            track.update_time(checkPoint(((tlbr[0]+tlbr[2])//2, tlbr[3]),cfg['area']))
+            track.update_time(checkPoint(((tlbr[0]+tlbr[2])//2, tlbr[3]),area))
 
+        mostStaningTime = 0
         for track in tracker.tracks:
             if not track.is_confirmed() or track.time_since_update > 1:  # 这个地方表示最近两帧中的对象都显示出来
                 continue
@@ -165,20 +195,52 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
             bbox = track.to_tlbr()
             cv2.rectangle(frame, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (0, 255, 0), 2)
             cv2.putText(frame, str(track.standing_time()) + 's', (int(bbox[0]), int(bbox[1])-20), 0, 5e-3 * 200, (0, 255, 0), 2)
+            mostStaningTime = max(mostStaningTime, track.standing_time())
             # cv2.putText(frame, str(track.track_id), (int(bbox[0]), int(bbox[1])), 0, 5e-3 * 200, (0, 255, 0), 2)
         if args.use_model == True and idx % 5 == 1:
             cv2.imwrite('/media/image/head.jpg', frame)
             # publish.single('image', payload='c', hostname='127.0.0.1')
-        idx += 1
-        cv2.imshow('win', frame)
+
+
+        #handle mqtt message
+        if queueSize > int(online_config.get('waitNumber', 999)):
+            cv2.putText(frame, 'too much people', (200, 50), cv2.FONT_HERSHEY_PLAIN, 2, (0, 0, 255),
+                        thickness=2)
+            root = dict()
+            root['message'] = 'too much people'
+            publish.single('warning', payload=json.dumps(root), hostname=MQTT_URL)
+        if mostStaningTime > int(online_config.get('waitTime', '999')):
+            cv2.putText(frame, 'wait too long', (200, 100), cv2.FONT_HERSHEY_PLAIN, 2, (0, 0, 255),
+                        thickness=2)
+            root = dict()
+            root['message'] = 'customer wait too long'
+            publish.single('warning', payload=json.dumps(root), hostname=MQTT_URL)
+            pass
+        num_json = dict()
+        standing_json = dict()
+        num_json['numberOfQueue'] = queueSize
+        publish.single('numQueue', payload=json.dumps(num_json), hostname=MQTT_URL)
+
+        standing_json['mostStandingTime'] = str(mostStaningTime)
+        # publish.single('mostStandingTime', payload=json.dumps(num_json), hostname=MQTT_URL)
+        publish.single('mostStandingTime', payload=json.dumps(standing_json), hostname=MQTT_URL)
+
+
+        if USE_IMSHOW:
+            cv2.imshow('win', frame)
+            q = cv2.waitKey(30)
+            if q == ord('q'):
+                break
+            elif q == ord('x'):
+                cv2.imwrite('{:05d}.jpg'.format(idx), frame)
+        elif USE_MQTT:
+            s = base64.b64encode(cv2.imencode('.jpg', frame)[1])
+            publish.single(topic='offlineImage', hostname=MQTT_URL, payload=s)
+        elif USE_FFMPEG:
+            standing_agent.send_image(frame)
         fps = (time.time() - t1)*1000
         print(fps)
-        q = cv2.waitKey(30)
-        if q == ord('q'):
-            break
-        elif q == ord('x'):
-            cv2.imwrite('{:05d}.jpg'.format(idx), frame)
-
+        idx += 1
 
         # if writeVideo_flag:
         # #     # save a frame
@@ -193,24 +255,18 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
         #         for i in range(0,len(boxs)):
         #             list_file.write(str(boxs[i][0]) + ' '+str(boxs[i][1]) + ' '+str(boxs[i][2]) + ' '+str(boxs[i][3]) + ' ')
         #     list_file.write('\n')
-
-    # video_capture.release()
     if writeVideo_flag:
         out.release()
         list_file.close()
     cv2.destroyAllWindows()
 
 if __name__ == '__main__':
-    with open('../config/standing.json', 'r') as r:
-        cfg = json.load(r)
-    print(cfg)
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input', type=str, default=os.path.abspath('/media/video/test.avi'))
-    parser.add_argument('--cfg-pa', type=str, default=os.path.abspath('../config'))
+    parser.add_argument('--input', type=str, default=os.path.abspath(online_config.get('VIDEO_PATH', '/media/video/test.avi')))
     parser.add_argument('--use-model', type=bool, default=True)
 
 
     args = parser.parse_args()
-    main(YOLO(), args, cfg)
+    main(YOLO(), args)
 
 
