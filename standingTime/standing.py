@@ -30,6 +30,7 @@ from configRetrive import ConfigRetrive
 import base64
 import logging
 from rtmpAgent import RTMP_AGENT
+from udn_socket import UDNClient
 import paho.mqtt.publish as publish
 # from debug_cost_mat import *
 warnings.filterwarnings('ignore')
@@ -39,6 +40,8 @@ online_config = ConfigRetrive()
 USE_IMSHOW = False
 USE_MQTT = False
 USE_FFMPEG = True
+USE_UDN = False
+udn_client = UDNClient('standing')
 MQTT_URL = online_config.get('MQTT_URL', '127.0.0.1')
 RTMP_URL = online_config.get("RTMP_URL", "127.0.0.1")
 RTMP_PORT = online_config.get('RTMP_PORT', 1935)
@@ -170,7 +173,6 @@ def main(yolo, args):  # 输入yolov3模型和视频路径
             for i in range(len(area)):
                 cv2.line(frame, tuple(area[i]), tuple(area[(i+1)%len(area)]),(0,0,255), thickness=2)
         cv2.putText(frame, 'queue: ' + str(queueSize), (50, 50), cv2.FONT_HERSHEY_PLAIN, 2, (255, 255, 255), thickness=2)
-
         det_frame = frame.copy()
         if online_config.get('SHOW_BBOX', False):
             for id, det in enumerate(det_out):
@@ -227,6 +229,7 @@ def main(yolo, args):  # 输入yolov3模型和视频路径
 
 
         if USE_IMSHOW:
+            cv2.putText(frame, time.asctime(),(50,100), cv2.FONT_HERSHEY_PLAIN, fontScale=1,color=(255,255,255))
             cv2.imshow('win', frame)
             q = cv2.waitKey(30)
             if q == ord('q'):
@@ -238,6 +241,9 @@ def main(yolo, args):  # 输入yolov3模型和视频路径
             publish.single(topic='offlineImage', hostname=MQTT_URL, payload=s)
         elif USE_FFMPEG:
             standing_agent.send_image(frame)
+        elif USE_UDN:
+            udn_client.send_img(frame)
+            pass
         fps = (time.time() - t1)*1000
         print(fps)
         idx += 1

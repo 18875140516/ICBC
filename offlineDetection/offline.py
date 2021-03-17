@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
-
+#todo: test select_pattern is ok?
+#todo: test config is ok？
 from __future__ import division, print_function, absolute_import
 import sys
 # print(sys.path)
@@ -32,6 +33,7 @@ import paho.mqtt.publish as publish
 import paho.mqtt.client as mqtt
 import threading
 from configRetrive import ConfigRetrive
+from rtmpAgent import RTMP_AGENT
 from utils.util import checkPoint
 import json
 import logging
@@ -49,9 +51,13 @@ clickPoint = None
 WIDTH = None
 HEIGHT = None
 LAST_APPEAR = 0  # 记录上一次出现的时间
-USE_MQTT = True
+USE_MQTT = False
 USE_IMSHOW = False
+USE_FFMPEG = True
+
 USE_PATTERN = True
+
+agent = RTMP_AGENT(topic='offline', protocal='hls')
 def load_model_pytorch(model_path):
     model = MGN()
     model = model.to('cuda')
@@ -108,45 +114,45 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
     global WIDTH
     global LAST_APPEAR
     managerStat = 'online'
-    if USE_MQTT:
-        def listenMQ():
-        #从消息队列获得信息，然后改变当前状态
-            def on_connect(client, userdata, flags, rc):
-                print("Connected with result code " + str(rc))
-
-                # Subscribing in on_connect() means that if we lose the connection and
-                # reconnect then subscriptions will be renewed.
-                client.subscribe(topic='selectPerson')
-                print('subscribe selectPerson successfully')
-
-            # The callback for when a PUBLISH message is received from the server.
-            def on_message(client, userdata, msg):
-                global startTrack
-                global tracked
-                global clickPoint
-                global WIDTH
-                global HEIGHT
-                global LAST_APPEAR
-                startTrack = True
-                print('reveive msg', msg.payload)
-                ret = json.loads(msg.payload)
-                x = int(WIDTH*float(ret['x']))
-                y = int(HEIGHT*float(ret['y']))
-                print('x=',x, 'y=',y)
-                clickPoint = (x, y)
-                LAST_APPEAR = time.time()
-                tracked = False
-                print(msg.payload)
-            client = mqtt.Client()
-            client.on_connect = on_connect
-            client.on_message = on_message
-            print('starting connecting')
-            ret = client.connect(MQTT_URL, 1883, 60)
-            print(ret)
-            print('ending connecting')
-            client.loop_forever()
-        sub_thread = threading.Thread(target=listenMQ)
-        sub_thread.start()
+    # if USE_MQTT:
+    #     def listenMQ():
+    #     #从消息队列获得信息，然后改变当前状态
+    #         def on_connect(client, userdata, flags, rc):
+    #             print("Connected with result code " + str(rc))
+    #
+    #             # Subscribing in on_connect() means that if we lose the connection and
+    #             # reconnect then subscriptions will be renewed.
+    #             client.subscribe(topic='selectPerson')
+    #             print('subscribe selectPerson successfully')
+    #
+    #         # The callback for when a PUBLISH message is received from the server.
+    #         def on_message(client, userdata, msg):
+    #             global startTrack
+    #             global tracked
+    #             global clickPoint
+    #             global WIDTH
+    #             global HEIGHT
+    #             global LAST_APPEAR
+    #             startTrack = True
+    #             print('reveive msg', msg.payload)
+    #             ret = json.loads(msg.payload)
+    #             x = int(WIDTH*float(ret['x']))
+    #             y = int(HEIGHT*float(ret['y']))
+    #             print('x=',x, 'y=',y)
+    #             clickPoint = (x, y)
+    #             LAST_APPEAR = time.time()
+    #             tracked = False
+    #             print(msg.payload)
+    #         client = mqtt.Client()
+    #         client.on_connect = on_connect
+    #         client.on_message = on_message
+    #         print('starting connecting')
+    #         ret = client.connect(MQTT_URL, 1883, 60)
+    #         print(ret)
+    #         print('ending connecting')
+    #         client.loop_forever()
+    #     sub_thread = threading.Thread(target=listenMQ)
+    #     sub_thread.start()
 
     # Definition of the parameters
     max_cosine_distance = 0.3  # 允许相同人的最大余弦距离0.3
@@ -197,7 +203,7 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
         # print(img.shape)
         default_area = [[112, 271], [243, 488], [650, 431], [480, 230]]
         default_area = [[x[0]/img.shape[1], x[1]/img.shape[0]] for x in default_area]
-        area = online_config.get('entry', default_area)
+        area = online_config.get('offline_area', default_area)
         area = [[int(x[0] * img.shape[1]), int(x[1] * img.shape[0])] for x in area]
         # img = cv2.resize(img, ( img.shape[1]//2,img.shape[0]//2))
         if ret == False:
@@ -233,8 +239,8 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
 
         if USE_PATTERN:
             logging.info('get manager_pattern')
-            manager_pattern = online_config.get('manager_pattern', None)# byte array
-            print("manager_pattern = ", manager_pattern)
+            manager_pattern = online_config.get('manager', None)# byte array
+            # print("manager = ", manager_pattern)
             if manager_pattern is not None:
                 tracked = True
                 startTrack = True
@@ -331,11 +337,12 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
 
                 print('refound the target')
             cv2.putText(img, managerStat, (50, 50), cv2.FONT_HERSHEY_PLAIN, fontScale=3, thickness=3, color=(0, 0, 255))
-            if USE_MQTT:
-                root = dict()
-                root['status'] = managerStat
-                s = json.dumps(root)
-                publish.single(topic='managerStatus', payload=s, hostname=MQTT_URL)
+
+            root = dict()
+            root['status'] = managerStat
+            s = json.dumps(root)
+            publish.single(topic='managerStatus', payload=s, hostname=MQTT_URL)
+
         #选定前的画面
         else:
             for id, det in enumerate(detections):
@@ -343,6 +350,10 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
                 bbox[2:] += bbox[:2]
                 # print(bbox)
                 cv2.rectangle(img, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 255), 2)
+            root = dict()
+            root['status'] = 'default'
+            s = json.dumps(root)
+            publish.single(topic='managerStatus', payload=s, hostname=MQTT_URL)
 
         if USE_IMSHOW:#所有分支都需要
             cv2.imshow('win', img)
@@ -354,11 +365,14 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
             cv2.imwrite('/media/img/after.jpg', img)
             s = base64.b64encode(cv2.imencode('.jpg', img)[1])
             publish.single('offlineImage',payload=s, hostname=MQTT_URL)
+        elif USE_FFMPEG:
+            agent.send_image(img)
+            pass
         idx += 1
 
     if USE_IMSHOW:
         cv2.destroyAllWindows()
-        sub_thread.join()
+        # sub_thread.join()
 
 if __name__ == '__main__':
     with open('../config/standing.json', 'r') as r:

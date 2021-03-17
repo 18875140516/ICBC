@@ -1,3 +1,5 @@
+import time
+
 import cv2
 import subprocess
 class RTMP_AGENT:
@@ -11,6 +13,8 @@ class RTMP_AGENT:
 
     def send_image(self, frame):#
         assert frame is not None
+        #write time h:m:s
+        cv2.putText(frame, time.asctime(),(50,100), cv2.FONT_HERSHEY_PLAIN, fontScale=1,color=(255,255,255))
         if self.pipe is None:
             sizeStr = str(frame.shape[1])+'x' + str(frame.shape[0])
             m3u8_url = 'rtmp://' + self.rtmp_url + ':' + str(self.rtmp_port) + '/' + self.protocal + '/' + self.topic

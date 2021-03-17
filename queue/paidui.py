@@ -12,9 +12,9 @@ from configRetrive import ConfigRetrive
 from rtmpAgent import RTMP_AGENT
 OK = True
 paidui_config = ConfigRetrive()
-USE_WS = True
+USE_WS = False
 USE_FFMPEG = False
-USE_IMSHOW = False
+USE_IMSHOW = True
 
 MQTT_URL = '211.67.21.65'
 if USE_WS:
