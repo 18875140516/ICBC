@@ -53,7 +53,8 @@ HEIGHT = None
 LAST_APPEAR = 0  # 记录上一次出现的时间
 USE_MQTT = False
 USE_IMSHOW = False
-USE_FFMPEG = True
+USE_FFMPEG = False
+USE_INOTIFY = True
 
 USE_PATTERN = True
 
@@ -368,6 +369,8 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
         elif USE_FFMPEG:
             agent.send_image(img)
             pass
+        elif USE_INOTIFY:
+            cv2.imwrite('/tmp/flow_offline.jpg', img)
         idx += 1
 
     if USE_IMSHOW:

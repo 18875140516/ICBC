@@ -39,8 +39,10 @@ COLORS = np.random.randint(0, 255, size=(200, 3), dtype="uint8")
 online_config = ConfigRetrive()
 USE_IMSHOW = False
 USE_MQTT = False
-USE_FFMPEG = True
+USE_FFMPEG = False
+USE_INOTIFY = True
 USE_UDN = False
+
 udn_client = UDNClient('standing')
 MQTT_URL = online_config.get('MQTT_URL', '127.0.0.1')
 RTMP_URL = online_config.get("RTMP_URL", "127.0.0.1")
@@ -202,7 +204,8 @@ def main(yolo, args):  # 输入yolov3模型和视频路径
         if args.use_model == True and idx % 5 == 1:
             cv2.imwrite('/media/image/head.jpg', frame)
             # publish.single('image', payload='c', hostname='127.0.0.1')
-
+        #transfer to minute
+        mostStaningTime = mostStaningTime//60
 
         #handle mqtt message
         if queueSize > int(online_config.get('waitNumber', 999)):
@@ -227,6 +230,7 @@ def main(yolo, args):  # 输入yolov3模型和视频路径
         # publish.single('mostStandingTime', payload=json.dumps(num_json), hostname=MQTT_URL)
         publish.single('mostStandingTime', payload=json.dumps(standing_json), hostname=MQTT_URL)
 
+        cv2.putText(frame, time.asctime(), (50, 100), cv2.FONT_HERSHEY_PLAIN, fontScale=1, color=(255, 255, 255))
 
         if USE_IMSHOW:
             cv2.putText(frame, time.asctime(),(50,100), cv2.FONT_HERSHEY_PLAIN, fontScale=1,color=(255,255,255))
@@ -244,6 +248,8 @@ def main(yolo, args):  # 输入yolov3模型和视频路径
         elif USE_UDN:
             udn_client.send_img(frame)
             pass
+        elif USE_INOTIFY:
+            cv2.imwrite('/tmp/standing.jpg', frame)
         fps = (time.time() - t1)*1000
         print(fps)
         idx += 1
@@ -268,7 +274,9 @@ def main(yolo, args):  # 输入yolov3模型和视频路径
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input', type=str, default=os.path.abspath(online_config.get('VIDEO_PATH', '/media/video/test.avi')))
+    video_path = online_config.get('VIDEO_PATH', '/media/video/ch35_.mp4')
+    video_path = '/media/video/ch35_.mp4'
+    parser.add_argument('--input', type=str, default=os.path.abspath(video_path))
     parser.add_argument('--use-model', type=bool, default=True)
 
 

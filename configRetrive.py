@@ -8,8 +8,8 @@ MQTT_URL = '211.67.21.65'
 # MQTT_URL = 'x.y.z.p'
 PORT =1883
 TOPIC = 'config'
-#SERVER_IP='211.67.21.65'
-SERVER_IP = '127.0.0.1'
+SERVER_IP='211.67.21.65'
+# SERVER_IP = '127.0.0.1'
 SERVER_PORT = 10086
 logging.basicConfig(filename='/log/logger.log', level=logging.INFO,
                     format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s',
