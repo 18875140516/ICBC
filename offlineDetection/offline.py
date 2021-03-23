@@ -336,7 +336,6 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
                 LAST_APPEAR = time.time()
                 managerStat = 'online'
 
-                print('refound the target')
             cv2.putText(img, managerStat, (50, 50), cv2.FONT_HERSHEY_PLAIN, fontScale=3, thickness=3, color=(0, 0, 255))
 
             root = dict()
@@ -371,6 +370,7 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
             pass
         elif USE_INOTIFY:
             cv2.imwrite('/tmp/flow_offline.jpg', img)
+        print('frame: ', idx, 'cost time:', time.time() - start)
         idx += 1
 
     if USE_IMSHOW:

@@ -20,6 +20,7 @@ class ConfigRetrive:
         self.topic = topic
         self.port = port
         self.url = url
+        self.thread_ = None
         self.config = dict()
         self.client = mqtt.Client()
         self.getConfigFromServer()
@@ -58,6 +59,10 @@ class ConfigRetrive:
         cfg_str = cfg_byte.decode()
         self.config = json.loads(cfg_str)
         print(self.config)
+
+    def __del__(self):
+        if self.thread_ is not None:
+            self.thread_.join()
 #-------------------------------------------以下为操作示例--------------------    
 # config = ConfigRetrive()
 # while True:

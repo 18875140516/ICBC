@@ -1,5 +1,7 @@
 import paho.mqtt.publish as publish
 import json
+import sys
+sys.path.append('../')
 root = dict()
 root = {
   "MQTT_URL":"211.67.21.65",
@@ -23,8 +25,31 @@ root = {
   "SHOW_AREA": True
 
 }
-for key in root:
-    cfg = dict()
-    cfg[key] = root[key]
-    s = json.dumps(cfg)
-    publish.single(topic='config', payload=s, hostname="211.67.21.65")
+# for key in root:
+#     cfg = dict()
+#     cfg[key] = root[key]
+#     s = json.dumps(cfg)
+#     publish.single(topic='config', payload=s, hostname="211.67.21.65")
+
+
+#-------------------test publish config---------------
+#import cv2
+#import base64
+#cap = cv2.VideoCapture('/media/video/test.avi')
+#MQTT_URL = '211.67.21.65'
+##send to config
+#ret, img = cap.read()
+#assert ret == True
+#img = cv2.resize(img, (348, 128))
+#img_b64 = base64.b64encode(cv2.imencode('.jpg', img)[1]).decode()
+#
+#print()
+#print()
+#topic = 'standing_area'
+#publish.single(topic='config',payload=json.dumps({topic:img_b64}),hostname=MQTT_URL)
+#
+##---------------------test get config --------------------------
+#import time
+#time.sleep(3)
+#from configRetrive import ConfigRetrive
+#config = ConfigRetrive()
