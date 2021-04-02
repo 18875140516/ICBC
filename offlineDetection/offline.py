@@ -29,9 +29,7 @@ from mgn.network import MGN
 from mgn.utils.extract_feature import extract_feature
 from yolo import YOLO
 from utils.util import checkPoint, compute_iou
-import paho.mqtt.publish as publish
-import paho.mqtt.client as mqtt
-import threading
+import paho.mqtt.client as client
 from configRetrive import ConfigRetrive
 from rtmpAgent import RTMP_AGENT
 from utils.util import checkPoint
@@ -59,6 +57,8 @@ USE_INOTIFY = True
 USE_PATTERN = True
 
 agent = RTMP_AGENT(topic='offline', protocal='hls')
+offline_client = client.Client()
+offline_client.connect(host=MQTT_URL)
 def load_model_pytorch(model_path):
     model = MGN()
     model = model.to('cuda')
@@ -114,6 +114,9 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
     global HEIGHT
     global WIDTH
     global LAST_APPEAR
+    cur_period = 0
+    last_statistics_minute = 0
+    hour_to_offline_time = dict()
     managerStat = 'online'
     # if USE_MQTT:
     #     def listenMQ():
@@ -164,7 +167,7 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
     # encoder = gdet.create_box_encoder(model_filename, batch_size=1)
     # mgn model
     print('loading mgn model')
-    mgn = load_model_pytorch('/home/lyz/Desktop/ReID-MGN/model.pt')
+    mgn = load_model_pytorch('/home/liuyongzhi/data/model.pt')
     print('load mgn OK')
     test_video_flag = True
     writeVideo_flag = False  # 是否写入视频
@@ -195,8 +198,10 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
     old_bbox = None
     old_lost_time = 0
     while True:
-        start = time.clock()
+        start = time.time()
         ret, img = cap.read()
+        leaveTime = online_config.get('leaveTime', '999')
+        leaveTime = int(leaveTime)
         if not ret:
             cap = cv2.VideoCapture(args.input)
             ret, img = cap.read()
@@ -239,7 +244,7 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
 
 
         if USE_PATTERN:
-            logging.info('get manager_pattern')
+            #logging.info('get manager_pattern')
             manager_pattern = online_config.get('manager', None)# byte array
             # print("manager = ", manager_pattern)
             if manager_pattern is not None:
@@ -323,9 +328,43 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
                     matched = True
                 break
 
+            #calculate offlineTime
+            #todo: send offlinetime list to activemq
+            #topic = 'config', {'offlineArray':[12 ,23, 12]}
+            #test
+            leaveTime = 1
+            statistics_cycle = 1
+
+
+            if matched and time.time() - LAST_APPEAR > leaveTime:
+                cur_period += time.time() - LAST_APPEAR
+                print('update cur period', cur_period)
+
+            minute = time.asctime().split(':')[1]
+            hour = time.asctime().split(':')[0].split(' ')[-1]
+            if ( 60 + int(minute) - last_statistics_minute)%60 >= statistics_cycle:
+                if hour in hour_to_offline_time.keys():
+                    hour_to_offline_time[hour] += cur_period
+                else:
+                    hour_to_offline_time[hour] = cur_period
+                #send to config
+                offline_array = dict()
+                offline_array['offlineArray'] = []
+                print("hour_to_offline_time=", hour_to_offline_time)
+                for i in range(8, 22):
+                    if str(i) in hour_to_offline_time.keys():
+                        offline_array['offlineArray'].append(int(hour_to_offline_time[str(i)]))
+                print('offline_array', offline_array)
+                last_statistics_minute = int(minute)
+                offline_client.publish(topic='config', payload=json.dumps(offline_array))
+            if int(hour) > 22:
+                hour_to_offline_time.clear()
+
+
+
             if matched == False:
                 # print('lost ', time.time() - LAST_APPEAR, 's')
-                if time.time() - LAST_APPEAR > 10:
+                if time.time() - LAST_APPEAR > leaveTime:
                     managerStat = 'offline'
                 else:
                     managerStat = 'leave'
@@ -341,7 +380,7 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
             root = dict()
             root['status'] = managerStat
             s = json.dumps(root)
-            publish.single(topic='managerStatus', payload=s, hostname=MQTT_URL)
+            offline_client.publish(topic='managerStatus', payload=s)
 
         #选定前的画面
         else:
@@ -353,7 +392,7 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
             root = dict()
             root['status'] = 'default'
             s = json.dumps(root)
-            publish.single(topic='managerStatus', payload=s, hostname=MQTT_URL)
+            offline_client.publish(topic='managerStatus', payload=s)
 
         if USE_IMSHOW:#所有分支都需要
             cv2.imshow('win', img)
@@ -364,13 +403,13 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
         elif USE_MQTT:
             cv2.imwrite('/media/img/after.jpg', img)
             s = base64.b64encode(cv2.imencode('.jpg', img)[1])
-            publish.single('offlineImage',payload=s, hostname=MQTT_URL)
+            offline_client.publish('offlineImage',payload=s)
         elif USE_FFMPEG:
             agent.send_image(img)
             pass
         elif USE_INOTIFY:
             cv2.imwrite('/tmp/flow_offline.jpg', img)
-        print('frame: ', idx, 'cost time:', time.time() - start)
+        print('frame: ', idx, 'cost time(ms):', str(1000*(time.time() - start)).split('.')[0])
         idx += 1
 
     if USE_IMSHOW:

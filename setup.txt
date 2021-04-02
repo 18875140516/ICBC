@@ -1,0 +1,9 @@
+ : 1617005184:0;pip install torch==1.6.0  
+   4 : 1617005346:0;pip install opencv-python
+   6 : 1617005359:0;pip install Pillow
+  10 : 1617005383:0;pip install torchvision==0.7.0
+  15 : 1617005418:0;pip install -i https://pypi.douban.com/simple scikit-learn==0.19.2
+  18 : 1617005451:0;pip install scipy
+  21 : 1617005470:0;pip install keras==2.2.5
+  23 : 1617005490:0;pip install tensorflow-gpu==1.14.0
+pip install torch==1.6.0+cu101 torchvision==0.7.0+cu101 -f https://download.pytorch.org/whl/torch_st     able.html -i https://pypi.tuna.tsinghua.edu.cn/simple/
