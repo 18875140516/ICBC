@@ -62,6 +62,7 @@ class simple_yolov5:
         classnames = []
 
         for *xyxy, conf, cls in reversed(det):
+            xyxy = [int(i) for i in xyxy]
             if classes is not None and self.names[int(cls)] not in classes:
                 continue
             xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh

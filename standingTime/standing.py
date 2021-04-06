@@ -13,6 +13,7 @@ from __future__ import division, print_function, absolute_import
 import sys
 print(sys.path)
 sys.path.append('../')
+# sys.path.append('/home/liuyongzhi/program/yolov5')
 import argparse
 import json
 import os
@@ -32,8 +33,9 @@ from deep_sort.tracker import Tracker
 from mgn.network import MGN
 # from coordinate_transform import CoordTrans
 from mgn.utils.extract_feature import extract_feature
-from yolo import YOLO
-from utils.util import checkPoint
+# from yolo import YOLO as simple_yolov5
+from yolov5.simple_detect import simple_yolov5
+from utils_icbc.util import checkPoint
 from configRetrive import ConfigRetrive
 import base64
 import logging
@@ -42,6 +44,9 @@ from udn_socket import UDNClient
 import paho.mqtt.publish as publish
 import paho.mqtt.client as client
 import pymysql
+
+import matplotlib.pyplot as plt
+
 # from debug_cost_mat import *
 warnings.filterwarnings('ignore')
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
@@ -118,6 +123,27 @@ def box_encode(model, img, boxes, prefix='./img1/'):
         features = torch.cat((features, query_feature), 0)
     return features.numpy()
 
+cost_array = []
+class avg_cal:
+    sum1 = 0
+    frame1 = 0
+    t1 = 0
+    @classmethod
+    def tik(cls):
+        cls.t1 = time.time()*1000
+    @classmethod
+    def tok(cls):
+        cls.frame1 += 1
+        cls.sum1 += time.time()*1000 - cls.t1
+        if cls.frame1 == 0:
+            ret = 0
+        else:
+            ret  = cls.sum1/cls.frame1
+        cost_array.append(time.time()*1000 - cls.t1)
+        # print(len(cost_array))
+        print('avg cost = ', ret, 'ms', 'frame = ', cls.frame1, 'cur=',time.time()*1000 - cls.t1, 'ms' )
+
+
 
 def main(yolo, args):  # 输入yolov3模型和视频路径
 
@@ -169,6 +195,7 @@ def main(yolo, args):  # 输入yolov3模型和视频路径
 
 
         t1 = time.time()
+        avg_cal.tik()
         if writeVideo_flag:
             out_img = []
         ret, frame = cap.read()
@@ -186,13 +213,15 @@ def main(yolo, args):  # 输入yolov3模型和视频路径
             continue
         area = [[int(x[0]*frame.shape[1]), int(x[1]*frame.shape[0])] for x in area]
         image = Image.fromarray(frame[..., ::-1])  # bgr to rgb
-        boxs, classname = yolo.detect_image(image)  # xy w h
-        print('detect cost', (time.time() - t1)*1000, 'ms')
+        boxs, classname = yolo.detect_image(frame)  # xy w h
+
+        avg_cal.tok()
+        # print('detect cost', (time.time() - t1)*1000, 'ms')
         features = box_encode(mgn, Image.fromarray(frame[..., ::-1]), boxs, prefix='./img1')
         detections = [Detection(bbox, 1.0, feature) for bbox, feature in zip(boxs, features)]
-        boxes = np.array([d.tlwh for d in detections])
+        # boxes = np.array([d.tlwh for d in detections])
         scores = np.array([d.confidence for d in detections])
-        indices = preprocessing.non_max_suppression(boxes, nms_max_overlap, scores)
+        indices = preprocessing.non_max_suppression(np.array(boxs), nms_max_overlap, scores)
         detections = [detections[i] for i in indices]
 
         det_out = []
@@ -306,8 +335,10 @@ def main(yolo, args):  # 输入yolov3模型和视频路径
             pass
         elif USE_INOTIFY:
             cv2.imwrite('/tmp/flow_standing.jpg', frame)
-        fps = (time.time() - t1)*1000
-        print(fps)
+
+        if idx % 50 == 0:
+            plt.plot(cost_array)
+            plt.show()
         idx += 1
 
         # if writeVideo_flag:
@@ -337,6 +368,6 @@ if __name__ == '__main__':
 
 
     args = parser.parse_args()
-    main(YOLO(), args)
+    main(simple_yolov5(), args)
 
 

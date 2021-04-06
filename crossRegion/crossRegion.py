@@ -25,7 +25,7 @@ from mgn.network import MGN
 # from coordinate_transform import CoordTrans
 from mgn.utils.extract_feature import extract_feature
 from yolo import YOLO
-from utils.util import checkPoint
+from utils_icbc.util import checkPoint
 # from debug_cost_mat import *
 warnings.filterwarnings('ignore')
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
