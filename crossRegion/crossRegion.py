@@ -86,7 +86,7 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
     nn_budget = None
     nms_max_overlap = 1.0  # 非极大值抑制，减少重复bbox，针对一类物体独立操作
     # deep_sort
-    model_filename = 'model_data/mars-small128.pb'  # 128维特征预测模型，效果不佳，rank1极低
+    model_filename = 'weigths/mars-small128.pb'  # 128维特征预测模型，效果不佳，rank1极低
     # encoder = gdet.create_box_encoder(model_filename, batch_size=1)
     # mgn model
     print('loading mgn model')

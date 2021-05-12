@@ -1,3 +1,6 @@
+import sys
+#输入yolov5具体的目录
+sys.path.append('/home/liuyongzhi/ICBC/yolov5')
 import argparse
 import time
 from pathlib import Path
@@ -16,6 +19,7 @@ from utils.torch_utils import select_device, load_classifier, time_synchronized
 
 global_model = None
 class simple_yolov5:
+    #更改为权重文件路径
     def __init__(self, weights='/home/liuyongzhi/data/yolov5x.pt', img_size=640):
         self.half = True
         self.imgsz = img_size
@@ -33,7 +37,6 @@ class simple_yolov5:
         # self.names = global_model.module.names if hasattr(global_model, 'module') else global_model.names
         self.frame = 0
         self.sum = 0
-        self.fd = open('./log_simple', 'w')
         pass
 
     def detect_image(self, im0, classes=['person']):
@@ -47,7 +50,6 @@ class simple_yolov5:
         img = img/255.0
         if img.ndimension() == 3:
             img = img.unsqueeze(0)
-        print(img.shape)#512 640
         pred = self.model(img, augment=False)[0]
         pred = non_max_suppression(pred, 0.25, 0.45, classes=None, agnostic=False)
 

@@ -31,11 +31,13 @@ if('tensorflow' == K.backend()):
     sess = tf.Session(config=config)
 
 class YOLO(object):
-    ROOT = '/home/liuyongzhi/ICBC/'
+    #修改为项目所在路径
+    ROOT = os.getcwd()
+    print('ROOT = ', os.getcwd())
     def __init__(self
-                 ,class_path = ROOT+'model_data/coco_classes.txt'
-                 , model_path=ROOT+'model_data/yolo.h5'
-                 , anchor_path= ROOT + 'model_data/yolo_anchors.txt'):
+                 ,class_path = os.path.join(ROOT,'model_data/coco_classes.txt')
+                 , model_path= os.path.join(ROOT, 'weights/yolo.h5')
+                 , anchor_path= os.path.join(ROOT , 'model_data/yolo_anchors.txt')):
         self.model_path = model_path
         self.anchors_path = anchor_path
         self.classes_path = class_path

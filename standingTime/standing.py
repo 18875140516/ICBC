@@ -13,7 +13,6 @@ from __future__ import division, print_function, absolute_import
 import sys
 print(sys.path)
 sys.path.append('../')
-# sys.path.append('/home/liuyongzhi/program/yolov5')
 import argparse
 import json
 import os
@@ -158,10 +157,10 @@ def main(yolo, args):  # 输入yolov3模型和视频路径
     nn_budget = None
     nms_max_overlap = 1.0  # 非极大值抑制，减少重复bbox，针对一类物体独立操作
     # deep_sort
-    model_filename = 'model_data/mars-small128.pb'  # 128维特征预测模型，效果不佳，rank1极低
+    model_filename = 'weights/mars-small128.pb'  # 128维特征预测模型，效果不佳，rank1极低
     # encoder = gdet.create_box_encoder(model_filename, batch_size=1)
     # mgn model
-    mgn = load_model_pytorch('/home/liuyongzhi/data/model.pt')
+    mgn = load_model_pytorch(args.weights)
     test_video_flag = True
     writeVideo_flag = False  # 是否写入视频
 
@@ -365,9 +364,12 @@ if __name__ == '__main__':
     #video_path = '/media/video/ch35_.mp4'
     parser.add_argument('--input', type=str, default=os.path.abspath(video_path))
     parser.add_argument('--use-model', type=bool, default=True)
+    parser.add_argument('--weights', type=str, default='/home/liuyongzhi/data/model.pt')
+    parser.add_argument('--weights_yolov5', type=str, default='/home/liuyongzhi/data/yolov5x.pt')
+
 
 
     args = parser.parse_args()
-    main(simple_yolov5(), args)
+    main(simple_yolov5(weights=args.weights_yolov5), args)
 
 

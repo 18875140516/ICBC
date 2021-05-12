@@ -13,3 +13,6 @@ __pycache__
 
 logger.log
 yolov5/runs/
+weights/
+*.swp
+*.ipynb
