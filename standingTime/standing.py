@@ -131,7 +131,7 @@ class avg_cal:
     def tik(cls):
         cls.t1 = time.time()*1000
     @classmethod
-    def tok(cls):
+    def tok(cls, s='default'):
         cls.frame1 += 1
         cls.sum1 += time.time()*1000 - cls.t1
         if cls.frame1 == 0:
@@ -140,7 +140,7 @@ class avg_cal:
             ret  = cls.sum1/cls.frame1
         cost_array.append(time.time()*1000 - cls.t1)
         # print(len(cost_array))
-        print('avg cost = ', ret, 'ms', 'frame = ', cls.frame1, 'cur=',time.time()*1000 - cls.t1, 'ms' )
+        print(s+':avg cost = ', ret, 'ms', 'frame = ', cls.frame1, 'cur=',time.time()*1000 - cls.t1, 'ms' )
 
 
 
@@ -214,7 +214,6 @@ def main(yolo, args):  # 输入yolov3模型和视频路径
         image = Image.fromarray(frame[..., ::-1])  # bgr to rgb
         boxs, classname = yolo.detect_image(frame)  # xy w h
 
-        avg_cal.tok()
         # print('detect cost', (time.time() - t1)*1000, 'ms')
         features = box_encode(mgn, Image.fromarray(frame[..., ::-1]), boxs, prefix='./img1')
         detections = [Detection(bbox, 1.0, feature) for bbox, feature in zip(boxs, features)]
@@ -340,6 +339,7 @@ def main(yolo, args):  # 输入yolov3模型和视频路径
             plt.show()
         idx += 1
 
+        avg_cal.tok('inference')
         # if writeVideo_flag:
         # #     # save a frame
         #     out_img = np.array(out_img)
