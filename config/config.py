@@ -4,13 +4,13 @@ import sys
 sys.path.append('../')
 root = dict()
 root = {
-  "MQTT_URL":"211.67.21.65",
+  "MQTT_URL":"211.67.22.33",
   "MQTT_PORT":  1883,
-  "MYSQL_URL": "211.67.21.65",
+  "MYSQL_URL": "211.67.22.33",
   "MYSQL_PORT": 3306,
-  "RTMP_URL": "211.67.21.65",
+  "RTMP_URL": "211.67.22.33",
   "RTMP_PORT": 1935,
-  "CONFIG_SERVER_URL": "211.67.21.65",
+  "CONFIG_SERVER_URL": "211.67.22.33",
   "CONFIG_SERVER_PORT": 10086,
   "STANDING_TOPIC": "standing",
   "DEAULT_AREA": [[0.3770833333333333, 0.4515625],
@@ -29,14 +29,14 @@ root = {
 #     cfg = dict()
 #     cfg[key] = root[key]
 #     s = json.dumps(cfg)
-#     publish.single(topic='config', payload=s, hostname="211.67.21.65")
+#     publish.single(topic='config', payload=s, hostname="211.67.22.33")
 
 
 #-------------------test publish config---------------
 #import cv2
 #import base64
 #cap = cv2.VideoCapture('/media/video/test.avi')
-#MQTT_URL = '211.67.21.65'
+#MQTT_URL = '211.67.22.33'
 ##send to config
 #ret, img = cap.read()
 #assert ret == True

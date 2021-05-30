@@ -40,7 +40,7 @@ import logging
 warnings.filterwarnings('ignore')
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 COLORS = np.random.randint(0, 255, size=(200, 3), dtype="uint8")
-MQTT_URL = '211.67.21.65'
+MQTT_URL = '211.67.22.33'
 online_config = ConfigRetrive()
 startTrack = False
 tracked = False
