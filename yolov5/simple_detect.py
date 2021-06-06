@@ -1,6 +1,8 @@
 import sys
+import os
 #输入yolov5具体的目录
-sys.path.append('/home/liuyongzhi/ICBC/yolov5')
+yolov5_module = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(yolov5_module)
 import argparse
 import time
 from pathlib import Path

@@ -364,8 +364,8 @@ if __name__ == '__main__':
     #video_path = '/media/video/ch35_.mp4'
     parser.add_argument('--input', type=str, default=os.path.abspath(video_path))
     parser.add_argument('--use-model', type=bool, default=True)
-    parser.add_argument('--weights', type=str, default='/home/liuyongzhi/data/model.pt')
-    parser.add_argument('--weights_yolov5', type=str, default='/home/liuyongzhi/data/yolov5x.pt')
+    parser.add_argument('--weights', type=str, default='weights/model.pt')
+    parser.add_argument('--weights_yolov5', type=str, default='weights/yolov5x.pt')
 
 
 

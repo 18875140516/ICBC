@@ -456,8 +456,8 @@ if __name__ == '__main__':
     # parser.add_argument('--input', type=str, default=os.path.abspath('/media/video/ch74_2020-05-27-090034.mp4'))
     parser.add_argument('--cfg-pa', type=str, default=os.path.abspath('../config'))
     parser.add_argument('--use-model', type=bool, default=True)
-    parser.add_argument('--weights', type=str, default='/home/liuyongzhi/data/model.pt')
-    parser.add_argument('--weights_yolov5', type=str, default='/home/liuyongzhi/data/yolov5x.pt')
+    parser.add_argument('--weights', type=str, default='./weights/model.pt')
+    parser.add_argument('--weights_yolov5', type=str, default='./weights/yolov5x.pt')
 
 
 
