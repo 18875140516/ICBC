@@ -12,18 +12,24 @@ current time = time.asctime().split(':')[1]
 from __future__ import division, print_function, absolute_import
 import sys
 print(sys.path)
-sys.path.append('../')
+#sys.path.append('../')
 import argparse
 import json
 import os
 import time
 import warnings
+import base64
+import logging
 
 import cv2
 import numpy as np
 import torch
 from PIL import Image
 from torchvision import transforms
+import pymysql
+import matplotlib.pyplot as plt
+import paho.mqtt.publish as publish
+import paho.mqtt.client as client
 
 from deep_sort import nn_matching
 from deep_sort import preprocessing
@@ -36,15 +42,9 @@ from mgn.utils.extract_feature import extract_feature
 from yolov5.simple_detect import simple_yolov5
 from utils_icbc.util import checkPoint
 from configRetrive import ConfigRetrive
-import base64
-import logging
 from rtmpAgent import RTMP_AGENT
 from udn_socket import UDNClient
-import paho.mqtt.publish as publish
-import paho.mqtt.client as client
-import pymysql
 
-import matplotlib.pyplot as plt
 
 # from debug_cost_mat import *
 warnings.filterwarnings('ignore')

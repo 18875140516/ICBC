@@ -4,13 +4,10 @@ import logging
 import json
 import time
 import socket
-MQTT_URL = '211.67.22.33'
-# MQTT_URL = 'x.y.z.p'
+
+from cfg import *
 PORT =1883
 TOPIC = 'config'
-SERVER_IP='211.67.22.33'
-# SERVER_IP = '127.0.0.1'
-SERVER_PORT = 10086
 logging.basicConfig(filename='/log/logger.log', level=logging.INFO,
                     format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s',
                         datefmt='%a, %d %b %Y %H:%M:%S')

@@ -9,15 +9,19 @@ import argparse
 import json
 import os
 import time
+import json
+import logging
 import warnings
 import sys
+import base64
 sys.path.append(os.path.abspath(os.getcwd()))
+
 import cv2
 import numpy as np
 import torch
 from PIL import Image
 from torchvision import transforms
-import base64
+
 from deep_sort import nn_matching
 from deep_sort import preprocessing
 from deep_sort.detection import Detection
@@ -32,15 +36,13 @@ import paho.mqtt.client as client
 from configRetrive import ConfigRetrive
 from rtmpAgent import RTMP_AGENT
 from utils_icbc.util import checkPoint
-import json
-import logging
+from cfg import *
 # from debug_cost_mat import *
 
 
 warnings.filterwarnings('ignore')
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 COLORS = np.random.randint(0, 255, size=(200, 3), dtype="uint8")
-MQTT_URL = '211.67.22.33'
 online_config = ConfigRetrive()
 startTrack = False
 tracked = False
@@ -110,7 +112,7 @@ def box_encode(model, img, boxes, prefix='./img1/'):
     return features.numpy()
 
 
-def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
+def main(yolo, args):  # 输入yolov3模型和视频路径
     global startTrack
     global tracked
     global clickPoint
@@ -449,8 +451,6 @@ def main(yolo, args, cfg):  # 输入yolov3模型和视频路径
         # sub_thread.join()
 
 if __name__ == '__main__':
-    with open('../config/standing.json', 'r') as r:
-        cfg = json.load(r)
     parser = argparse.ArgumentParser()
     parser.add_argument('--input', type=str, default=os.path.abspath('/media/video/test.avi'))
     # parser.add_argument('--input', type=str, default=os.path.abspath('/media/video/ch74_2020-05-27-090034.mp4'))
@@ -462,6 +462,6 @@ if __name__ == '__main__':
 
 
     args = parser.parse_args()
-    main(YOLO(weights=args.weights_yolov5), args, cfg)
+    main(YOLO(weights=args.weights_yolov5), args)
 
 
