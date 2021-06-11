@@ -1,6 +1,6 @@
 import numpy as np
 
-
+#判断点是否在二维点集对应的区域内
 def checkPoint(point, contours):
     c = False
     for i in range(len(contours)):

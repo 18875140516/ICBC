@@ -2,6 +2,7 @@ import time
 
 import cv2
 import subprocess
+#用于hls推流，但是由于hls推流延迟过高，现在没有在使用
 class RTMP_AGENT:
     def __init__(self, topic = 'test3',rtmp_url='211.67.21.65', rtmp_port='1935', protocal='hls'):
         self.rtmp_url = rtmp_url
